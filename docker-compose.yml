@@ -1,0 +1,46 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: wpp_bot_api
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      # para o fluxo.py chamar /mp internamente na porta correta
+      - API_INTERNAL_BASE=http://api:5000
+    ports:
+      # expõe 8000 no host -> 5000 dentro do container (onde o gunicorn escuta)
+      - "8000:5000"
+    volumes:
+      - .:/app
+      - ./chroma_data:/app/chroma_data
+    restart: always
+
+  waha_empresa1:
+    image: devlikeapro/waha:latest
+    container_name: waha_empresa1
+    environment:
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      # >>> porta interna correta da API (5000)
+      - WEBHOOK_URL=http://api:5000/webhook/empresa1
+    ports:
+      - "3001:3000"
+    restart: always
+    depends_on:
+      - api
+
+  waha_empresa2:
+    image: devlikeapro/waha:latest
+    container_name: waha_empresa2
+    environment:
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      # >>> porta interna correta da API (5000)
+      - WEBHOOK_URL=http://api:5000/webhook/empresa2
+    ports:
+      - "3002:3000"
+    restart: always
+    depends_on:
+      - api

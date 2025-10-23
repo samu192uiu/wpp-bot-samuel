@@ -1,0 +1,39 @@
+{
+"empresa": "empresa1",
+"currency": "BRL",
+"updated_at": "2025-09-04T00:00:00Z",
+"services": [
+{
+    "code": "1",
+    "id": "corte_social",
+    "label": "Corte social",
+    "price": 0.01,
+    "duration_min": 40,
+    "active": true
+},
+{
+    "code": "2",
+    "id": "degrade",
+    "label": "Degradê",
+    "price": 35.00,
+    "duration_min": 50,
+    "active": true
+},
+{
+    "code": "3",
+    "id": "sobrancelha",
+    "label": "Sobrancelha",
+    "price": 5.00,
+    "duration_min": 15,
+    "active": true
+},
+{
+    "code": "4",
+    "id": "barba",
+    "label": "Barba",
+    "price": 10.00,
+    "duration_min": 25,
+    "active": true
+}
+]
+}
