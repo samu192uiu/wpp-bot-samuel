@@ -137,8 +137,9 @@ def _resolve_empresa(payload_fields: Dict[str, Any]) -> Optional[str]:
     1) query string ?empresa=...
     2) header X-Empresa
     3) payload['empresa'] (ou data/payload interno)
-    4) se houver UMA única empresa no config, usa ela
-    5) fallback para 'empresa1'
+    4) session configurada no WAHA (waha_session em config)
+    5) se houver UMA única empresa no config, usa ela
+    6) fallback para 'empresa1'
     """
     q = request.args.get("empresa")
     if q and q in config_empresas:
@@ -151,6 +152,12 @@ def _resolve_empresa(payload_fields: Dict[str, Any]) -> Optional[str]:
     hint = payload_fields.get("empresa_hint")
     if hint and hint in config_empresas:
         return hint
+
+    session = payload_fields.get("session")
+    if session:
+        for empresa, cfg in config_empresas.items():
+            if cfg.get("waha_session", "default") == session:
+                return empresa
 
     # se só tem uma empresa configurada, retorna ela
     if len(config_empresas) == 1:
