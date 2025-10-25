@@ -3,13 +3,15 @@
     "mp_access_token": "APP_USR-6742786009777353-090612-9685c17554a59dbfae9a01adeff89e15-2631228563",
     "waha_session": "default",
     "base_url": "http://waha_empresa1:3000",
-    "statement_descriptor": "BARBEARIA ERIK"
+    "statement_descriptor": "BARBEARIA ERIK",
+    "waha_numbers": []
   },
   "empresa2": {
     "mp_access_token": "APP_USR-YYYYYYYY_YYYYYYYY",
     "waha_session": "empresa2",
     "base_url": "http://waha_empresa2:3000",
-    "statement_descriptor": "BARBEARIA ERIK 2"
+    "statement_descriptor": "BARBEARIA ERIK 2",
+    "waha_numbers": []
   },
   "clinica_fisio": {
     "mp_access_token": "APP_USR-PROTOTIPO",
@@ -17,6 +19,7 @@
     "base_url": "http://waha_clinica:3000",
     "statement_descriptor": "CLINICA FISIO PILATES",
     "pagamento_instrucoes": "Envie *quero pagar* informando o pacote para receber o link.",
-    "pagamento_link_base": "https://pagamentos.movimenta.exemplo/checkout"
+    "pagamento_link_base": "https://pagamentos.movimenta.exemplo/checkout",
+    "waha_numbers": ["5511911792144@c.us"]
   }
 }
