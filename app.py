@@ -114,7 +114,18 @@ def _extract_message_fields(payload: dict) -> Dict[str, Any]:
 
     # Empresa/sessão que às vezes vem no webhook
     empresa_hint = payload.get("empresa") or data.get("empresa")
-    session = payload.get("session") or data.get("session")
+    session = (
+        payload.get("session")
+        or data.get("session")
+        or payload.get("sessionId")
+        or data.get("sessionId")
+        or payload.get("session_id")
+        or data.get("session_id")
+        or payload.get("instanceId")
+        or data.get("instanceId")
+        or payload.get("instance_id")
+        or data.get("instance_id")
+    )
 
     return {
         "data": data,
@@ -154,7 +165,16 @@ def _resolve_empresa(payload_fields: Dict[str, Any]) -> Optional[str]:
         return hint
 
     session = payload_fields.get("session")
+    if isinstance(session, dict):
+        session = (
+            session.get("name")
+            or session.get("id")
+            or session.get("session")
+            or session.get("sessionId")
+        )
+
     if session:
+        session = str(session)
         for empresa, cfg in config_empresas.items():
             if cfg.get("waha_session", "default") == session:
                 return empresa
@@ -268,6 +288,15 @@ def waha_webhook():
     empresa = _resolve_empresa(fields)
     if not empresa:
         return jsonify({"status": "error", "message": "Não foi possível resolver a empresa."}), 400
+
+    try:
+        app.logger.info({
+            "empresa_resolvida": empresa,
+            "chat_id": fields.get("chat_id"),
+            "session": fields.get("session")
+        })
+    except Exception:
+        pass
 
     return _dispatch_to_flow(empresa, fields["chat_id"], fields["msg"])
 
