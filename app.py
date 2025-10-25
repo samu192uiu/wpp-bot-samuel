@@ -76,10 +76,14 @@ def _extract_message_fields(payload: dict) -> Dict[str, Any]:
             or payload
             or {})
 
+    # Alguns eventos do WAHA chegam como lista dentro de "data"
+    if isinstance(data, list) and data:
+        data = data[0]
+
     msg_obj = None
 
-    # 1) Objeto simples
-    if any(k in data for k in ("body", "text", "from", "chatId", "sender", "to", "fromMe", "timestamp", "t", "id", "messages")):
+    # 1) Objeto simples (payload "flat" do WAHA ou legacy)
+    if isinstance(data, dict) and any(k in data for k in ("body", "text", "from", "chatId", "sender", "to", "fromMe", "timestamp", "t", "id", "messages", "message")):
         msg_obj = data
 
     # 2) Lista messages dentro de data/payload
@@ -92,12 +96,54 @@ def _extract_message_fields(payload: dict) -> Dict[str, Any]:
 
     msg_obj = msg_obj or {}
 
-    text = (msg_obj.get("body") or msg_obj.get("text") or "").strip()
+    text = msg_obj.get("body") or msg_obj.get("text") or ""
+    if not isinstance(text, str):
+        text = str(text)
+    text = text.strip()
     chat_id = msg_obj.get("from") or msg_obj.get("chatId") or msg_obj.get("chat_id") or msg_obj.get("sender") or ""
     to = msg_obj.get("to") or ""
     from_me = bool(msg_obj.get("fromMe") or data.get("fromMe"))
 
-    ts = msg_obj.get("timestamp") or msg_obj.get("t") or data.get("timestamp") or data.get("t")
+    # Eventos recentes do WAHA usam a estrutura messages.upsert com "message" aninhado
+    if not text and isinstance(msg_obj.get("message"), dict):
+        message_node = msg_obj["message"]
+        text = (
+            message_node.get("conversation")
+            or message_node.get("extendedTextMessage", {}).get("text")
+            or message_node.get("ephemeralMessage", {}).get("message", {}).get("extendedTextMessage", {}).get("text")
+            or message_node.get("buttonsResponseMessage", {}).get("selectedDisplayText")
+            or ""
+        ).strip()
+
+        key_data = msg_obj.get("key", {}) if isinstance(msg_obj.get("key"), dict) else {}
+        if not chat_id:
+            chat_id = (
+                key_data.get("remoteJid")
+                or msg_obj.get("chatId")
+                or msg_obj.get("chat_id")
+                or ""
+            )
+        if not to:
+            to = key_data.get("participant") or key_data.get("from") or ""
+        if "fromMe" not in msg_obj and key_data:
+            from_me = bool(key_data.get("fromMe"))
+
+    if not chat_id and isinstance(msg_obj.get("key"), dict):
+        chat_id = msg_obj["key"].get("remoteJid", "")
+
+    chat_id = str(chat_id or "").strip()
+    if chat_id.endswith("@s.whatsapp.net"):
+        chat_id = chat_id.replace("@s.whatsapp.net", "@c.us")
+    to = str(to or "").strip()
+    from_me = bool(from_me)
+
+    ts = (
+        msg_obj.get("timestamp")
+        or msg_obj.get("t")
+        or msg_obj.get("messageTimestamp")
+        or data.get("timestamp")
+        or data.get("t")
+    )
     try:
         ts = int(ts)
         if ts > 10**12:  # se vier em ms, converte para s
