@@ -30,3 +30,28 @@ Com os contêineres ativos, os serviços internos se conversam pelos hostnames D
 3. Confirmar com `docker compose ps` que `waha_clinica` (e demais) estão `running`.
 4. Acessar o painel correspondente usando `http://<SEU_IP>:PORTA` ou via túnel SSH.
 5. Escanear o QR Code para autenticar o número de WhatsApp.
+
+## Como configurar o webhook no painel WAHA
+
+O `docker-compose.yml` já injeta a variável `WEBHOOK_URL` em cada container WAHA, apontando para o endpoint dinâmico da API Flask
+(`http://api:5000/webhook/<empresa>`). Isso significa que, logo após subir os contêineres, o WAHA passa a chamar o webhook correto sem
+você precisar mexer manualmente no painel.
+
+Ainda assim, se quiser conferir ou ajustar diretamente pelo dashboard:
+
+1. Abra o painel da instância desejada (ex.: `http://<SEU_IP>:3003` para `clinica_fisio`).
+2. No card da sessão (ícone de engrenagem), clique em **Webhooks**.
+3. Defina a URL exatamente como o ambiente docker já usa internamente:
+
+   ```text
+   http://api:5000/webhook/clinica_fisio
+   ```
+
+   > Troque `clinica_fisio` pelo slug da empresa caso esteja configurando outra instância (ex.: `empresa1`).
+
+4. Mantenha o método padrão (`POST`) e marque os eventos `messages.*` para que o bot receba todas as mensagens e status.
+5. Salve/Update. Se a sessão reiniciar, aguarde até voltar para `WORKING` e envie uma mensagem teste no WhatsApp.
+
+> 💡 Dica: se o WAHA estiver rodando em outra máquina ou você preferir usar um endereço público, substitua `http://api:5000` pelo host
+> (ou IP) onde a API Flask está acessível a partir do container WAHA. Dentro do mesmo `docker compose`, use sempre o hostname `api` e a
+> porta `5000` (porta interna do Gunicorn).
