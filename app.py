@@ -4,7 +4,7 @@ import importlib
 import traceback
 import threading
 import time
-from datetime import datetime, date␊
+from datetime import datetime, date
 from typing import Dict, Any, Optional, List
 
 from flask import Flask, request, jsonify
@@ -438,7 +438,9 @@ def webhook_dinamico(empresa: str):
         chat_id = p.get("from") or p.get("chatId") or p.get("chat_id")
         texto = p.get("body") or p.get("text") or p.get("message") or ""
 
- chat_id = _normalize_chat_id(chat_id or payload.get("chat_id") or payload.get("chatId"))
+    # *** CORREÇÃO DE INDENTAÇÃO AQUI ***
+    # Estas linhas estavam indentadas errado
+    chat_id = _normalize_chat_id(chat_id or payload.get("chat_id") or payload.get("chatId"))
     texto = (texto or payload.get("text") or payload.get("message") or payload.get("body") or "").strip()
 
     # se não conseguiu, usa o extrator robusto

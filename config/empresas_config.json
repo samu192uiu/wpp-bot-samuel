@@ -1,7 +1,6 @@
-
 {
   "empresa1": {
-    "mp_access_token": "APP_USR-6742786009777353-090612-9685c17554a59dbfae9a01adeff89e15-2631228563",
+    "mp_access_token": "",
     "waha_session": "default",
     "base_url": "http://waha_empresa1:3000",
     "statement_descriptor": "BARBEARIA ERIK"

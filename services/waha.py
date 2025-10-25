@@ -162,7 +162,10 @@ class Waha:
         payload = {"chatId": chat_id}
         if self.__session:
             payload["session"] = self.__session
-            try:
+        
+        # *** CORREÇÃO DE LÓGICA E INDENTAÇÃO AQUI ***
+        # O 'try' deve ficar fora do 'if' e a linha 'requests.post' deve ser indentada
+        try:
             requests.post(url, json=payload, headers=self.__headers, timeout=5)
         except Exception as e:
             print("[WAHA] Erro stop_typing:", repr(e))

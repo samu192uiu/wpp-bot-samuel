@@ -2,14 +2,13 @@ services:
   api:
     ports:
       - "5000:5000"
-    environment:
-      WAHA_API_KEY: "bispinho2012"
+    # A linha 'environment' com WAHA_API_KEY foi removida daqui
 
   waha_empresa1:
     environment:
       HOST: "0.0.0.0"
       PORT: "3000"
-      WAHA_API_KEY: "sha512:dd40bf1383f77d98e7b06c0548a48b747de5531943bc113565dc86776b9c8e545be0e81457975d3d81b0404ad4bcb2bb12f244942612b75ba16a09c6d90ae8dc"
+      # WAHA_API_KEY foi removida daqui
       WEBHOOK_URL: "http://api:5000/webhook/empresa1"
     volumes:
       - waha1_data:/tmp/whatsapp-files
@@ -18,7 +17,7 @@ services:
     environment:
       HOST: "0.0.0.0"
       PORT: "3000"
-      WAHA_API_KEY: "sha512:dd40bf1383f77d98e7b06c0548a48b747de5531943bc113565dc86776b9c8e545be0e81457975d3d81b0404ad4bcb2bb12f244942612b75ba16a09c6d90ae8dc"
+      # WAHA_API_KEY foi removida daqui
       WEBHOOK_URL: "http://api:5000/webhook/empresa2"
     volumes:
       - waha2_data:/tmp/whatsapp-files
@@ -27,7 +26,7 @@ services:
     environment:
       HOST: "0.0.0.0"
       PORT: "3000"
-      WAHA_API_KEY: "sha512:dd40bf1383f77d98e7b06c0548a48b747de5531943bc113565dc86776b9c8e545be0e81457975d3d81b0404ad4bcb2bb12f244942612b75ba16a09c6d90ae8dc"
+      # WAHA_API_KEY foi removida daqui
       WEBHOOK_URL: "http://api:5000/webhook/clinica_fisio"
     volumes:
       - waha_clinica_data:/tmp/whatsapp-files
