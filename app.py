@@ -46,8 +46,12 @@ for empresa, cfg in config_empresas.items():
     base_url = cfg.get("base_url")
     if base_url:
         try:
-            waha_clients[empresa] = Waha(base_url)
-            print(f"[WAHA] Cliente inicializado para '{empresa}' -> {base_url}")
+            session = cfg.get("waha_session") or "default"
+            api_key = cfg.get("waha_api_key") or os.getenv("WAHA_API_KEY")
+            waha_clients[empresa] = Waha(base_url, session=session, api_key=api_key)
+            print(
+                f"[WAHA] Cliente inicializado para '{empresa}' -> {base_url} (sessão: {session})"
+            )
         except Exception as e:
             print(f"[WAHA] Falha ao iniciar cliente da empresa '{empresa}': {e}")
 
