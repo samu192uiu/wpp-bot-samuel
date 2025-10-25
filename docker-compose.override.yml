@@ -3,7 +3,7 @@ services:
     ports:
       - "5000:5000"
     environment:
-      WAHA_API_KEY: "bispinho2012"
+      WAHA_API_KEY: "minhachavesecreta123"
 
   waha_empresa1:
     environment:

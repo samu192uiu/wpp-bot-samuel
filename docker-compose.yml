@@ -8,11 +8,9 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - WAHA_API_KEY=${WAHA_API_KEY}
-      # para o fluxo.py chamar /mp internamente na porta correta
+      - WAHA_API_KEY=${WAHA_API_KEY} # <-- ESTA LINHA DEVE ESTAR AQUI
       - API_INTERNAL_BASE=http://api:5000
     ports:
-      # expõe 8000 no host -> 5000 dentro do container (onde o gunicorn escuta)
       - "8000:5000"
     volumes:
       - .:/app
@@ -23,8 +21,7 @@ services:
     image: devlikeapro/waha:latest
     container_name: waha_empresa1
     environment:
-      - WAHA_API_KEY=${WAHA_API_KEY}
-      # >>> porta interna correta da API (5000)
+      - WAHA_API_KEY=${WAHA_API_KEY} # <-- E ESTA LINHA DEVE ESTAR AQUI
       - WEBHOOK_URL=http://api:5000/webhook/empresa1
     ports:
       - "3001:3000"
@@ -36,8 +33,7 @@ services:
     image: devlikeapro/waha:latest
     container_name: waha_empresa2
     environment:
-      - WAHA_API_KEY=${WAHA_API_KEY}
-      # >>> porta interna correta da API (5000)
+      - WAHA_API_KEY=${WAHA_API_KEY} # <-- E ESTA LINHA DEVE ESTAR AQUI
       - WEBHOOK_URL=http://api:5000/webhook/empresa2
     ports:
       - "3002:3000"
