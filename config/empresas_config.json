@@ -16,6 +16,7 @@
     "waha_session": "clinica_fisio",
     "base_url": "http://waha_clinica:3000",
     "statement_descriptor": "CLINICA FISIO PILATES",
-    "pagamento_instrucoes": "Envie *quero pagar* informando o pacote para receber o link."
+    "pagamento_instrucoes": "Envie *quero pagar* informando o pacote para receber o link.",
+    "pagamento_link_base": "https://pagamentos.movimenta.exemplo/checkout"
   }
 }
