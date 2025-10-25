@@ -10,5 +10,12 @@
     "waha_session": "empresa2",
     "base_url": "http://waha_empresa2:3000",
     "statement_descriptor": "BARBEARIA ERIK 2"
+  },
+  "clinica_fisio": {
+    "mp_access_token": "APP_USR-PROTOTIPO",
+    "waha_session": "clinica_fisio",
+    "base_url": "http://waha_clinica:3000",
+    "statement_descriptor": "CLINICA FISIO PILATES",
+    "pagamento_instrucoes": "Envie *quero pagar* informando o pacote para receber o link."
   }
 }
