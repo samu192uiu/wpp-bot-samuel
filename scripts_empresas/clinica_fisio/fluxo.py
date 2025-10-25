@@ -17,11 +17,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from dataclasses import dataclass, field
+from datetime import datetime
+import re
 from typing import Dict
+from uuid import uuid4
 
 from flask import jsonify
 
 CONFIG_EMPRESAS: Dict[str, dict] = {}
+ADMINS_EMPRESAS: Dict[str, list] = {}
 try:
     CONFIG_EMPRESAS = json.loads(
         (Path(__file__).resolve().parents[2] / "config" / "empresas_config.json").read_text(encoding="utf-8")
@@ -30,6 +34,20 @@ except FileNotFoundError:
     CONFIG_EMPRESAS = {}
 except json.JSONDecodeError:
     CONFIG_EMPRESAS = {}
+
+try:
+    ADMINS_EMPRESAS = json.loads(
+        (Path(__file__).resolve().parents[2] / "config" / "admins_config.json").read_text(encoding="utf-8")
+    )
+except FileNotFoundError:
+    ADMINS_EMPRESAS = {}
+except json.JSONDecodeError:
+    ADMINS_EMPRESAS = {}
+
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+LEADS_FILE = DATA_DIR / "clinica_fisio_leads.jsonl"
+
+VALOR_PADRAO_LINK = 120.0
 
 # ---------------------------------------------------------------------------
 # Mensagens fixas utilizadas no protótipo
@@ -128,6 +146,7 @@ def _continuar_agendamento(
     chat_id: str,
     estado: EstadoConversa,
     mensagem: str,
+    empresa: str,
 ) -> None:
     if estado.etapa == "agendamento_nome":
         estado.contexto["nome"] = mensagem.strip()
@@ -171,6 +190,16 @@ def _continuar_agendamento(
             )
         )
 
+        resumo_admin = (
+            "🗓️ *Novo pedido de agendamento*\n"
+            f"• Nome: {estado.contexto.get('nome', '-')}\n"
+            f"• Preferência: {estado.contexto.get('preferencia', '-')}\n"
+            f"• Observações: {estado.contexto.get('observacoes', 'Sem observações.')}\n"
+            f"• Recebido em: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        )
+        _registrar_lead(empresa, dict(estado.contexto))
+        _notificar_time(waha, empresa, resumo_admin)
+
         estado.etapa = "menu"
         estado.contexto = {}
         waha.send_message(chat_id, "Se precisar de mais algo, é só digitar *menu* para recomeçar. 😊")
@@ -186,8 +215,61 @@ def _responder_pagamentos(waha, chat_id: str, empresa: str) -> None:
     waha.send_message(chat_id, mensagem)
 
 
+def _gerar_link_pagamento(mensagem: str, empresa: str) -> str:
+    texto = mensagem.lower().replace("r$", "").strip()
+    numeros = re.findall(r"\d+[\.,]?\d*", texto)
+    valor = None
+    for bruto in numeros:
+        normalizado = bruto.replace(".", "").replace(",", ".")
+        try:
+            candidato = float(normalizado)
+        except ValueError:
+            continue
+        if candidato > 0:
+            valor = candidato
+            break
+
+    if valor is None:
+        valor = VALOR_PADRAO_LINK
+
+    base = CONFIG_EMPRESAS.get(empresa, {}).get(
+        "pagamento_link_base",
+        "https://pagamentos.movimenta.exemplo/checkout",
+    )
+    token = uuid4().hex[:10]
+    link = f"{base}?empresa={empresa}&token={token}&valor={valor:.2f}"
+
+    return (
+        "✅ Aqui está o seu link de pagamento seguro:\n"
+        f"{link}\n\n"
+        "Depois de concluir, nos avise por aqui para confirmarmos a aula!"
+    )
+
+
 def _responder_faq(waha, chat_id: str) -> None:
     waha.send_message(chat_id, MENSAGEM_FAQ)
+
+
+def _registrar_lead(empresa: str, dados: Dict[str, str]) -> None:
+    try:
+        DATA_DIR.mkdir(exist_ok=True)
+        payload = {
+            "empresa": empresa,
+            "capturado_em": datetime.utcnow().isoformat(),
+            "dados": dados,
+        }
+        with LEADS_FILE.open("a", encoding="utf-8") as fp:
+            fp.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception as exc:  # pragma: no cover - falhas não devem quebrar o fluxo
+        print(f"[clinica_fisio] Falha ao registrar lead: {exc}")
+
+
+def _notificar_time(waha, empresa: str, mensagem: str) -> None:
+    for admin in ADMINS_EMPRESAS.get(empresa, []) or []:
+        try:
+            waha.send_message(admin, mensagem)
+        except Exception as exc:  # pragma: no cover - não deve interromper
+            print(f"[clinica_fisio] Falha ao notificar admin {admin}: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -224,8 +306,14 @@ def processar(chat_id: str, msg: str, empresa: str, waha, fluxo_usuario: Dict[st
         return jsonify({"status": "success"}), 200
 
     # Fluxo principal
+    if texto.startswith("quero pagar"):
+        link = _gerar_link_pagamento(msg, empresa)
+        waha.send_message(chat_id, link)
+        _salvar_estado(fluxo_usuario, chat_id, estado)
+        return jsonify({"status": "success"}), 200
+
     if estado.etapa.startswith("agendamento"):
-        _continuar_agendamento(waha, chat_id, estado, msg)
+        _continuar_agendamento(waha, chat_id, estado, msg, empresa)
         _salvar_estado(fluxo_usuario, chat_id, estado)
         return jsonify({"status": "success"}), 200
 

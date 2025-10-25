@@ -1,4 +1,3 @@
-
 {
   "empresa1": {
     "mp_access_token": "APP_USR-6742786009777353-090612-9685c17554a59dbfae9a01adeff89e15-2631228563",
@@ -17,6 +16,7 @@
     "waha_session": "clinica_fisio",
     "base_url": "http://waha_clinica:3000",
     "statement_descriptor": "CLINICA FISIO PILATES",
-    "pagamento_instrucoes": "Envie *quero pagar* informando o pacote para receber o link."
+    "pagamento_instrucoes": "Envie *quero pagar* informando o pacote para receber o link.",
+    "pagamento_link_base": "https://pagamentos.movimenta.exemplo/checkout"
   }
 }

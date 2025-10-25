@@ -33,10 +33,23 @@ services:
     image: devlikeapro/waha:latest
     container_name: waha_empresa2
     environment:
-      - WAHA_API_KEY=${WAHA_API_KEY} # <-- E ESTA LINHA DEVE ESTAR AQUI
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      # >>> porta interna correta da API (5000)
       - WEBHOOK_URL=http://api:5000/webhook/empresa2
     ports:
       - "3002:3000"
+    restart: always
+    depends_on:
+      - api
+
+  waha_clinica:
+    image: devlikeapro/waha:latest
+    container_name: waha_clinica
+    environment:
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - WEBHOOK_URL=http://api:5000/webhook/clinica_fisio
+    ports:
+      - "3003:3000"
     restart: always
     depends_on:
       - api
