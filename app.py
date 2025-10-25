@@ -4,8 +4,8 @@ import importlib
 import traceback
 import threading
 import time
-from datetime import datetime, date
-from typing import Tuple, Dict, Any, Optional
+from datetime import datetime, date␊
+from typing import Dict, Any, Optional, List
 
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
@@ -40,20 +40,68 @@ with open(os.path.join(CONFIG_DIR, "empresas_config.json"), "r", encoding="utf-8
 with open(os.path.join(CONFIG_DIR, "admins_config.json"), "r", encoding="utf-8") as f:
     admins_por_empresa: Dict[str, list] = json.load(f)
 
+
+def _normalize_chat_id(identifier: Optional[str]) -> str:
+    """Converte identificadores do WhatsApp para o formato @c.us."""
+    if identifier is None:
+        return ""
+
+    raw = str(identifier).strip()
+    if not raw:
+        return ""
+
+    if raw.startswith("+"):
+        raw = raw[1:]
+
+    if raw.endswith("@s.whatsapp.net"):
+        raw = raw.replace("@s.whatsapp.net", "@c.us")
+
+    if raw.endswith("@c.us") or raw.endswith("@g.us"):
+        return raw
+
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if digits:
+        return f"{digits}@c.us"
+
+    return raw
+
+
 # Um cliente WAHA por empresa
 waha_clients: Dict[str, Waha] = {}
+empresa_por_session: Dict[str, List[str]] = {}
+empresa_por_numero_bot: Dict[str, str] = {}
+
 for empresa, cfg in config_empresas.items():
     base_url = cfg.get("base_url")
     if base_url:
         try:
-            session = cfg.get("waha_session") or "default"
+            session_cfg = cfg.get("waha_session")
+            session = session_cfg.strip() if isinstance(session_cfg, str) else None
+            if not session:
+                session = "default"
             api_key = cfg.get("waha_api_key") or os.getenv("WAHA_API_KEY")
             waha_clients[empresa] = Waha(base_url, session=session, api_key=api_key)
+            empresa_por_session.setdefault(session, []).append(empresa)
             print(
                 f"[WAHA] Cliente inicializado para '{empresa}' -> {base_url} (sessão: {session})"
             )
         except Exception as e:
             print(f"[WAHA] Falha ao iniciar cliente da empresa '{empresa}': {e}")
+
+    numeros_cfg: List[str] = []
+    if isinstance(cfg.get("waha_numbers"), list):
+        numeros_cfg.extend(cfg["waha_numbers"])
+    elif cfg.get("waha_numbers"):
+        numeros_cfg.append(cfg["waha_numbers"])
+
+    numero_unico = cfg.get("waha_number")
+    if numero_unico:
+        numeros_cfg.append(numero_unico)
+
+    for numero in numeros_cfg:
+        normalizado = _normalize_chat_id(numero)
+        if normalizado:
+            empresa_por_numero_bot[normalizado] = empresa
 
 # Estado de fluxo em memória, separado por empresa
 fluxo_usuario: Dict[str, Dict[str, Any]] = {empresa: {} for empresa in config_empresas.keys()}
@@ -76,10 +124,14 @@ def _extract_message_fields(payload: dict) -> Dict[str, Any]:
             or payload
             or {})
 
+    # Alguns eventos do WAHA chegam como lista dentro de "data"
+    if isinstance(data, list) and data:
+        data = data[0]
+
     msg_obj = None
 
-    # 1) Objeto simples
-    if any(k in data for k in ("body", "text", "from", "chatId", "sender", "to", "fromMe", "timestamp", "t", "id", "messages")):
+    # 1) Objeto simples (payload "flat" do WAHA ou legacy)
+    if isinstance(data, dict) and any(k in data for k in ("body", "text", "from", "chatId", "sender", "to", "fromMe", "timestamp", "t", "id", "messages", "message")):
         msg_obj = data
 
     # 2) Lista messages dentro de data/payload
@@ -92,12 +144,54 @@ def _extract_message_fields(payload: dict) -> Dict[str, Any]:
 
     msg_obj = msg_obj or {}
 
-    text = (msg_obj.get("body") or msg_obj.get("text") or "").strip()
+    text = msg_obj.get("body") or msg_obj.get("text") or ""
+    if not isinstance(text, str):
+        text = str(text)
+    text = text.strip()
     chat_id = msg_obj.get("from") or msg_obj.get("chatId") or msg_obj.get("chat_id") or msg_obj.get("sender") or ""
     to = msg_obj.get("to") or ""
     from_me = bool(msg_obj.get("fromMe") or data.get("fromMe"))
 
-    ts = msg_obj.get("timestamp") or msg_obj.get("t") or data.get("timestamp") or data.get("t")
+    # Eventos recentes do WAHA usam a estrutura messages.upsert com "message" aninhado
+    if not text and isinstance(msg_obj.get("message"), dict):
+        message_node = msg_obj["message"]
+        text = (
+            message_node.get("conversation")
+            or message_node.get("extendedTextMessage", {}).get("text")
+            or message_node.get("ephemeralMessage", {}).get("message", {}).get("extendedTextMessage", {}).get("text")
+            or message_node.get("buttonsResponseMessage", {}).get("selectedDisplayText")
+            or ""
+        ).strip()
+
+        key_data = msg_obj.get("key", {}) if isinstance(msg_obj.get("key"), dict) else {}
+        if not chat_id:
+            chat_id = (
+                key_data.get("remoteJid")
+                or msg_obj.get("chatId")
+                or msg_obj.get("chat_id")
+                or ""
+            )
+        if not to:
+            to = key_data.get("participant") or key_data.get("from") or ""
+        if "fromMe" not in msg_obj and key_data:
+            from_me = bool(key_data.get("fromMe"))
+
+    if not chat_id and isinstance(msg_obj.get("key"), dict):
+        chat_id = msg_obj["key"].get("remoteJid", "")
+
+    chat_id = str(chat_id or "").strip()
+    if chat_id.endswith("@s.whatsapp.net"):
+        chat_id = chat_id.replace("@s.whatsapp.net", "@c.us")
+    to = str(to or "").strip()
+    from_me = bool(from_me)
+
+    ts = (
+        msg_obj.get("timestamp")
+        or msg_obj.get("t")
+        or msg_obj.get("messageTimestamp")
+        or data.get("timestamp")
+        or data.get("t")
+    )
     try:
         ts = int(ts)
         if ts > 10**12:  # se vier em ms, converte para s
@@ -114,13 +208,41 @@ def _extract_message_fields(payload: dict) -> Dict[str, Any]:
 
     # Empresa/sessão que às vezes vem no webhook
     empresa_hint = payload.get("empresa") or data.get("empresa")
-    session = payload.get("session") or data.get("session")
+    session = (
+        payload.get("session")
+        or data.get("session")
+        or payload.get("sessionId")
+        or data.get("sessionId")
+        or payload.get("session_id")
+        or data.get("session_id")
+        or payload.get("instanceId")
+        or data.get("instanceId")
+        or payload.get("instance_id")
+        or data.get("instance_id")
+    )
+
+    owner = None
+    owner_node = None
+    if isinstance(data.get("owner"), dict):
+        owner_node = data.get("owner")
+    elif isinstance(msg_obj.get("owner"), dict):
+        owner_node = msg_obj.get("owner")
+
+    if owner_node:
+        owner = owner_node.get("id") or owner_node.get("wid") or owner_node.get("number")
+
+    if not owner:
+        possible_owner = msg_obj.get("from") if from_me else msg_obj.get("to")
+        owner = possible_owner
+
+    owner = _normalize_chat_id(owner)
 
     return {
         "data": data,
         "msg": text,
         "chat_id": chat_id,
         "to": to,
+        "owner": owner,
         "from_me": from_me,
         "ts": ts,
         "msg_id": msg_id,
@@ -137,8 +259,9 @@ def _resolve_empresa(payload_fields: Dict[str, Any]) -> Optional[str]:
     1) query string ?empresa=...
     2) header X-Empresa
     3) payload['empresa'] (ou data/payload interno)
-    4) se houver UMA única empresa no config, usa ela
-    5) fallback para 'empresa1'
+    4) session configurada no WAHA (waha_session em config)
+    5) se houver UMA única empresa no config, usa ela
+    6) fallback para 'empresa1'
     """
     q = request.args.get("empresa")
     if q and q in config_empresas:
@@ -152,11 +275,35 @@ def _resolve_empresa(payload_fields: Dict[str, Any]) -> Optional[str]:
     if hint and hint in config_empresas:
         return hint
 
+    session = payload_fields.get("session")
+    if isinstance(session, dict):
+        session = (
+            session.get("name")
+            or session.get("id")
+            or session.get("session")
+            or session.get("sessionId")
+        )
+
+    if session:
+        session = str(session)
+        candidatos = empresa_por_session.get(session)
+        if candidatos and len(candidatos) == 1:
+            return candidatos[0]
+
+    owner = _normalize_chat_id(payload_fields.get("owner"))
+    if owner and owner in empresa_por_numero_bot:
+        return empresa_por_numero_bot[owner]
+
+    to = _normalize_chat_id(payload_fields.get("to"))
+    if to and to in empresa_por_numero_bot:
+        return empresa_por_numero_bot[to]
+
     # se só tem uma empresa configurada, retorna ela
     if len(config_empresas) == 1:
         return next(iter(config_empresas.keys()))
-
+    
     # fallback comum ao seu compose
+
     return "empresa1" if "empresa1" in config_empresas else None
 
 def _get_waha_for(empresa: str) -> Optional[Waha]:
@@ -245,7 +392,8 @@ def waha_webhook():
         app.logger.info({"waha_webhook_raw": payload})
         app.logger.info({"waha_webhook_norm": {
             "from": fields["chat_id"], "text": fields["msg"],
-            "fromMe": fields["from_me"], "ts": fields["ts"], "id": fields["msg_id"]
+            "fromMe": fields["from_me"], "ts": fields["ts"], "id": fields["msg_id"],
+            "owner": fields["owner"], "to": fields["to"],
         }})
     except Exception:
         pass
@@ -261,6 +409,17 @@ def waha_webhook():
     empresa = _resolve_empresa(fields)
     if not empresa:
         return jsonify({"status": "error", "message": "Não foi possível resolver a empresa."}), 400
+
+    try:
+        app.logger.info({
+            "empresa_resolvida": empresa,
+            "chat_id": fields.get("chat_id"),
+            "session": fields.get("session"),
+            "owner": fields.get("owner"),
+            "to": fields.get("to"),
+        })
+    except Exception:
+        pass
 
     return _dispatch_to_flow(empresa, fields["chat_id"], fields["msg"])
 
@@ -279,7 +438,7 @@ def webhook_dinamico(empresa: str):
         chat_id = p.get("from") or p.get("chatId") or p.get("chat_id")
         texto = p.get("body") or p.get("text") or p.get("message") or ""
 
-    chat_id = (chat_id or payload.get("chat_id") or payload.get("chatId") or "").strip()
+ chat_id = _normalize_chat_id(chat_id or payload.get("chat_id") or payload.get("chatId"))
     texto = (texto or payload.get("text") or payload.get("message") or payload.get("body") or "").strip()
 
     # se não conseguiu, usa o extrator robusto
