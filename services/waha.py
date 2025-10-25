@@ -12,9 +12,10 @@ class Waha:
     - start_typing(chat_id) / stop_typing(chat_id): indicador de digitação.
     """
 
-    def __init__(self, base_url: str, session: str = "default", api_key: Optional[str] = None):
+    def __init__(self, base_url: str, session: Optional[str] = "default", api_key: Optional[str] = None):
         self.__api_url = (base_url or "").rstrip("/")
-        self.__session = session
+        # Permite desabilitar o uso explícito de sessão caso o WAHA utilize apenas a sessão padrão
+        self.__session = (session or None)
         self.__headers = {"Content-Type": "application/json"}
 
         # Se você proteger o WAHA com WAHA_API_KEY, envie o header
@@ -34,9 +35,15 @@ class Waha:
     # ----------------------
     def send_message(self, chat_id: str, message: str):
         url = f"{self.__api_url}/api/sendText"
-        payload = {"session": self.__session, "chatId": chat_id, "text": message}
+        payload = {"chatId": chat_id, "text": message}
+        if self.__session:
+            payload["session"] = self.__session
         try:
             resp = requests.post(url, json=payload, headers=self.__headers, timeout=10)
+            if resp.status_code >= 400 and self.__session:
+                # fallback: tenta novamente sem enviar session para compatibilidade com instâncias single-session
+                payload.pop("session", None)
+                resp = requests.post(url, json=payload, headers=self.__headers, timeout=10)
             if resp.status_code >= 400:
                 print("[WAHA] send_message erro:", resp.status_code, str(resp.text)[:300])
         except Exception as e:
@@ -75,13 +82,14 @@ class Waha:
         # 1) Tenta /api/sendFile (formato mais flexível nas versões recentes)
         url_file = f"{self.__api_url}/api/sendFile"
         payload_file = {
-            "session": self.__session,
             "chatId": chat_id,
             "file": {
                 "name": filename,
                 "data": data_uri
             }
         }
+        if self.__session:
+            payload_file["session"] = self.__session
         if caption:
             payload_file["caption"] = caption
 
@@ -97,10 +105,11 @@ class Waha:
         # 2) Tenta /api/sendImage (algumas versões usam 'base64' diretamente)
         url_img = f"{self.__api_url}/api/sendImage"
         payload_img = {
-            "session": self.__session,
             "chatId": chat_id,
             "base64": base64_puro
         }
+        if self.__session:
+            payload_img["session"] = self.__session
         if caption:
             payload_img["caption"] = caption
 
@@ -121,7 +130,10 @@ class Waha:
     # ----------------------
     def get_history_messages(self, chat_id: str, limit: int = 50):
         # Rota comum (ajuste conforme sua versão do WAHA)
-        url = f"{self.__api_url}/api/{self.__session}/chats/{chat_id}/messages"
+        if self.__session:
+            url = f"{self.__api_url}/api/{self.__session}/chats/{chat_id}/messages"
+        else:
+            url = f"{self.__api_url}/api/chats/{chat_id}/messages"
         try:
             resp = requests.get(url, params={"limit": limit, "downloadMedia": "false"},
                                 headers=self.__headers, timeout=10)
@@ -136,7 +148,10 @@ class Waha:
 
     def start_typing(self, chat_id: str):
         url = f"{self.__api_url}/api/startTyping"
-        payload = {"session": self.__session, "chatId": chat_id}
+        payload = {"chatId": chat_id}
+        if self.__session:
+            payload["session"] = self.__session
+
         try:
             requests.post(url, json=payload, headers=self.__headers, timeout=5)
         except Exception as e:
@@ -144,8 +159,10 @@ class Waha:
 
     def stop_typing(self, chat_id: str):
         url = f"{self.__api_url}/api/stopTyping"
-        payload = {"session": self.__session, "chatId": chat_id}
-        try:
+        payload = {"chatId": chat_id}
+        if self.__session:
+            payload["session"] = self.__session
+            try:
             requests.post(url, json=payload, headers=self.__headers, timeout=5)
         except Exception as e:
             print("[WAHA] Erro stop_typing:", repr(e))
