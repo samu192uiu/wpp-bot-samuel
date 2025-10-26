@@ -11,10 +11,8 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       WAHA_API_KEY: ${WAHA_API_KEY}
-      # para o fluxo.py chamar /mp internamente na porta correta
       API_INTERNAL_BASE: http://api:5000
     ports:
-      # expõe 8000 no host -> 5000 dentro do container (onde o gunicorn escuta)
       - "8000:5000"
     volumes:
       - .:/app
@@ -26,7 +24,6 @@ services:
     container_name: waha_empresa1
     environment:
       WAHA_API_KEY: ${WAHA_API_KEY}
-      # >>> porta interna correta da API (5000)
       WEBHOOK_URL: http://api:5000/webhook/empresa1
     ports:
       - "3001:3000"
@@ -39,7 +36,6 @@ services:
     container_name: waha_empresa2
     environment:
       WAHA_API_KEY: ${WAHA_API_KEY}
-      # >>> porta interna correta da API (5000)
       WEBHOOK_URL: http://api:5000/webhook/empresa2
     ports:
       - "3002:3000"
@@ -53,6 +49,12 @@ services:
     environment:
       WAHA_API_KEY: ${WAHA_API_KEY}
       WEBHOOK_URL: http://api:5000/webhook/clinica_fisio
+      # Senha do Dashboard (/dashboard)
+      WAHA_DASHBOARD_USERNAME: admin
+      WAHA_DASHBOARD_PASSWORD: admin
+      # Senha do Swagger (/)
+      WHATSAPP_SWAGGER_USERNAME: admin
+      WHATSAPP_SWAGGER_PASSWORD: admin
     ports:
       - "3003:3000"
     restart: always

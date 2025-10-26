@@ -2,13 +2,11 @@ services:
   api:
     ports:
       - "5000:5000"
-    # A linha 'environment' com WAHA_API_KEY foi removida daqui
 
   waha_empresa1:
     environment:
       HOST: "0.0.0.0"
       PORT: "3000"
-      # WAHA_API_KEY foi removida daqui
       WEBHOOK_URL: "http://api:5000/webhook/empresa1"
     volumes:
       - waha1_data:/tmp/whatsapp-files
@@ -17,7 +15,6 @@ services:
     environment:
       HOST: "0.0.0.0"
       PORT: "3000"
-      # WAHA_API_KEY foi removida daqui
       WEBHOOK_URL: "http://api:5000/webhook/empresa2"
     volumes:
       - waha2_data:/tmp/whatsapp-files
@@ -26,7 +23,6 @@ services:
     environment:
       HOST: "0.0.0.0"
       PORT: "3000"
-      # WAHA_API_KEY foi removida daqui
       WEBHOOK_URL: "http://api:5000/webhook/clinica_fisio"
     volumes:
       - waha_clinica_data:/tmp/whatsapp-files
